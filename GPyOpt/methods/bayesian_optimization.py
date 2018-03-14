@@ -75,7 +75,7 @@ class BayesianOptimization(BO):
     def __init__(self, f, domain = None, constraints = None, cost_withGradients = None, model_type = 'GP', X = None, Y = None,
     	initial_design_numdata = 5, initial_design_type='random', acquisition_type ='EI', normalize_Y = True,
         exact_feval = False, acquisition_optimizer_type = 'lbfgs', model_update_interval=1, evaluator_type = 'sequential',
-        batch_size = 1, num_cores = 1, verbosity=False, verbosity_model = False, maximize=False, de_duplication=False, **kwargs):
+        batch_size = 1, num_cores = 1, verbosity=False, verbosity_model = False, de_duplication=False, **kwargs):
 
         self.modular_optimization = False
         self.initial_iter = True
@@ -94,16 +94,15 @@ class BayesianOptimization(BO):
         self.space = Design_space(self.domain, self.constraints)
 
         # --- CHOOSE objective function
-        self.maximize = maximize
         if 'objective_name' in kwargs: self.objective_name = kwargs['objective_name']
         else: self.objective_name = 'no_name'
         self.batch_size = batch_size
         self.num_cores = num_cores
         if f is not None:
-            self.f = self._sign(f)
-            self.objective = SingleObjective(self.f, self.batch_size,self.objective_name)
+            self.score_func = self._wrap_func(f)
+            self.objective = SingleObjective(self.score_func, self.batch_size,self.objective_name)
         else:
-            self.f = None
+            self.score_func = None
             self.objective = None
 
         # --- CHOOSE the cost model
@@ -183,7 +182,7 @@ class BayesianOptimization(BO):
         """
 
         # If objective function was not provided, we require some initial sample data
-        if self.f is None and (self.X is None or self.Y is None):
+        if self.score_func is None and (self.X is None or self.Y is None):
             raise InvalidConfigError("Initial data for both X and Y is required when objective function is not provided")
 
         # Case 1:
@@ -194,8 +193,11 @@ class BayesianOptimization(BO):
         elif self.X is not None and self.Y is None:
             self.Y, _ = self.objective.evaluate(self.X)
 
-    def _sign(self,f):
-         if self.maximize:
-             f_copy = f
-             def f(x):return -f_copy(x)
-         return f
+    def _wrap_func(self, f):
+        f_copy = f
+
+        def f(x):
+            params = self.space.vec2params(x)
+            score = f_copy(params)
+            return score
+        return f

@@ -121,7 +121,7 @@ class BO(object):
 
         # --- Initialize iterations and running time
         self.time_zero = time.time()
-        self.cum_time  = 0
+        self.cum_time = 0
         self.num_acquisitions = 0
         self.suggested_sample = self.X
         self.Y_new = self.Y
@@ -246,8 +246,7 @@ class BO(object):
                 elif normalization_type == 'maxmin':
                     Y_inmodel = (self.Y - self.Y.min())/(self.Y.max()-self.Y.min())
             else:
-                Y_inmodel =self.Y
-
+                Y_inmodel = self.Y
             self.model.updateModel(X_inmodel, Y_inmodel, None, None)
 
         ### --- Save parameters of the model
@@ -387,3 +386,15 @@ class BO(object):
 
         data = [header] + results.tolist()
         self._write_csv(models_file, data)
+
+
+    def search(self, return_full=False, *args, **kwargs):
+        # Optimization
+        self.run_optimization(*args, **kwargs)
+        if return_full:
+            best_x = [self.space.vec2params([x]) for x in self.X]
+            best_y = self.Y[:, 0]
+        else:
+            best_x = self.space.vec2params([self.x_opt])
+            best_y = np.min(self.Y[:, 0])
+        return best_x, best_y
