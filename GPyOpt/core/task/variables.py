@@ -3,6 +3,7 @@ from copy import deepcopy
 
 from ..errors import InvalidConfigError
 
+
 class Variable(object):
     def __init__(self, name, var_type, domain, dimensionality):
         self.name = name
@@ -31,7 +32,7 @@ class Variable(object):
             one_d_variable = deepcopy(self)
             one_d_variable.dimensionality = 1
             if self.dimensionality > 1:
-                one_d_variable.name = '{}_{}'.format(self.name, i+1)
+                one_d_variable.name = '{}_{}'.format(self.name, i + 1)
             else:
                 one_d_variable.name = self.name
             one_d_variable.dimensionality_in_model = 1
@@ -64,7 +65,7 @@ class Variable(object):
         """
         raise NotImplementedError()
 
-    def set_index_in_objective(self,index):
+    def set_index_in_objective(self, index):
         """
         Allows to set the index of this variable in the objective space
         """
@@ -82,6 +83,12 @@ class Variable(object):
         Value is assumed to be in a 1x[variable dimentionality] numpy array
         """
         raise NotImplementedError()
+
+    def params_to_model(self, value):
+        return value
+
+    def model_to_params(self, value):
+        return value
 
 
 class NumericalVariable(Variable):
@@ -160,6 +167,10 @@ class IntegerVariable(NumericalVariable):
             return [int(round(val))]
         else:
             return [val]
+
+    def model_to_params(self, value):
+        value = int(round(value))
+        return value
 
 
 class BanditVariable(Variable):
@@ -255,13 +266,13 @@ class CategoricalVariable(Variable):
         entry = self.domain[int(entry)]
         return [entry]
 
-    def name_to_index(self, name):
+    def params_to_model(self, name):
         idx = list(self._domain).index(name)
         return idx
 
-    def index_to_name(self, idx):
-        name = self._domain[int(idx)]
-        return name
+    def model_to_params(self, value):
+        value = self._domain[int(value)]
+        return value
 
     def get_bounds(self):
         return [(0.0, 1.)] * self.dimensionality_in_model
@@ -277,7 +288,6 @@ class CategoricalVariable(Variable):
         rounded_values = np.zeros(value_array.shape)
         rounded_values[np.argmax(value_array)] = 1
         return rounded_values
-
 
 
 def create_variable(descriptor):

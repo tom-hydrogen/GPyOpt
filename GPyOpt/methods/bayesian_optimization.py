@@ -16,6 +16,8 @@ from ..models.warpedgpmodel import WarpedGPModel
 from ..models.input_warped_gpmodel import InputWarpedGPModel
 from ..optimization.acquisition_optimizer import AcquisitionOptimizer
 import GPyOpt
+import numpy as np
+from copy import deepcopy
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -36,8 +38,8 @@ class BayesianOptimization(BO):
         - 'warperdGP', warped Gaussian process.
         - 'InputWarpedGP', input warped Gaussian process
         - 'RF', random forest (scikit-learn).
-    :param X: 2d numpy array containing the initial inputs (one per row) of the model.
-    :param Y: 2d numpy array containing the initial outputs (one per row) of the model.
+    :param X: list(dict)
+    :param Y: 2d or 1d numpy array containing the initial outputs (one per row) of the model.
     :initial_design_numdata: number of initial points that are collected jointly before start running the optimization.
     :initial_design_type: type of initial design:
         - 'random', to collect points in random locations.
@@ -92,14 +94,19 @@ class BayesianOptimization(BO):
         self.constraints = constraints
         self.domain = domain
         self.space = Design_space(self.domain, self.constraints)
+        _domain, _constraints = self._get_initial_domain(self.domain,
+                                                         self.constraints)
+        self.initial_space = Design_space(_domain, _constraints)
 
         # --- CHOOSE objective function
         if 'objective_name' in kwargs: self.objective_name = kwargs['objective_name']
         else: self.objective_name = 'no_name'
         self.batch_size = batch_size
         self.num_cores = num_cores
-        if f is not None:
-            self.score_func = self._wrap_func(f)
+
+        self._score_func = f
+        if self._score_func is not None:
+            self.score_func = self._wrapped_func
             self.objective = SingleObjective(self.score_func, self.batch_size,self.objective_name)
         else:
             self.score_func = None
@@ -108,10 +115,16 @@ class BayesianOptimization(BO):
         # --- CHOOSE the cost model
         self.cost = CostModel(cost_withGradients)
 
-        # --- CHOOSE initial design
+        # --- CHOOSE initial design\
+        if X is not None:
+            X = np.array([self.space.params2vec(x) for x in X])
+        if Y is not None:
+            Y = np.array(Y)
+            if len(Y.shape) == 1:
+                Y = Y[:, None]
         self.X = X
         self.Y = Y
-        self.initial_design_type  = initial_design_type
+        self.initial_design_type = initial_design_type
         self.initial_design_numdata = initial_design_numdata
         self._init_design_chooser()
 
@@ -187,17 +200,28 @@ class BayesianOptimization(BO):
 
         # Case 1:
         if self.X is None:
-            self.X = initial_design(self.initial_design_type, self.space, self.initial_design_numdata)
+            _X = initial_design(self.initial_design_type,
+                                self.initial_space,
+                                self.initial_design_numdata)
+            _X = [self.initial_space.objective_to_model([x_i]) for x_i in _X]
+            _X = [self.space.model_to_objective([x_i]) for x_i in _X]
+            self.X = np.array(_X)
             self.Y, _ = self.objective.evaluate(self.X)
         # Case 2
         elif self.X is not None and self.Y is None:
             self.Y, _ = self.objective.evaluate(self.X)
 
-    def _wrap_func(self, f):
-        f_copy = f
+    def _wrapped_func(self, x):
+        params = self.space.vec2params(x)
+        score = self._score_func(params)
+        return score
 
-        def f(x):
-            params = self.space.vec2params(x)
-            score = f_copy(params)
-            return score
-        return f
+    def _get_initial_domain(self, domain, constraints):
+        domain = deepcopy(domain)
+        for conf in domain:
+            if conf.get("scale", None) == "log"\
+                    and conf["type"] in ["continuous", "integer"]:
+                d = conf["domain"]
+                conf["domain"] = (np.log10(d[0]), np.log10(d[1]))
+                del conf["scale"]
+        return domain, constraints

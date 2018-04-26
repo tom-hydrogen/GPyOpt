@@ -103,8 +103,7 @@ class Design_space(object):
         vec = []
         for conf, var in zip(self.config_space_expanded, self.space_expanded):
             val = params[conf['name']]
-            if hasattr(var, 'name_to_index'):
-                val = var.name_to_index(val)
+            val = var.params_to_model(val)
             vec.append(val)
         return vec
 
@@ -114,8 +113,7 @@ class Design_space(object):
         for i, val in enumerate(vec[0]):
             conf = self.config_space_expanded[i]
             var = self.space_expanded[i]
-            if hasattr(var, 'index_to_name'):
-                val = var.index_to_name(val)
+            val = var.model_to_params(val)
             params[conf["name"]] = val
         return params
 
@@ -389,7 +387,7 @@ class Design_space(object):
         """
         bounds = []
         for d in self.space:
-            if d.type == 'continuous':
+            if d.type in ['continuous', 'integer']:
                 bounds.extend([d.domain]*d.dimensionality)
         return bounds
 
@@ -400,7 +398,7 @@ class Design_space(object):
         """
         continuous_dims = []
         for i in range(self.dimensionality):
-            if self.space_expanded[i].type == 'continuous':
+            if self.space_expanded[i].type in ['continuous', 'integer']:
                 continuous_dims += [i]
         return continuous_dims
 
@@ -409,7 +407,7 @@ class Design_space(object):
         """
         Extracts the list of dictionaries with continuous components
         """
-        return [d for d in self.space if d.type == 'continuous']
+        return [d for d in self.space if d.type in ['continuous', 'integer']]
 
 
     ###

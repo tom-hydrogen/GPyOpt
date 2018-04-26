@@ -100,7 +100,7 @@ class BO(object):
 
         # --- Setting up stop conditions
         self.eps = eps
-        if  (max_iter is None) and (max_time is None):
+        if (max_iter is None) and (max_time is None):
             self.max_iter = 0
             self.max_time = np.inf
         elif (max_iter is None) and (max_time is not None):
@@ -387,12 +387,11 @@ class BO(object):
         data = [header] + results.tolist()
         self._write_csv(models_file, data)
 
-
-    def search(self, return_full=False, *args, **kwargs):
+    def search(self, return_full=False, eps=0, *args, **kwargs):
         # Optimization
-        self.run_optimization(*args, **kwargs)
+        self.run_optimization(eps=eps, *args, **kwargs)
         if return_full:
-            best_x = [self.space.vec2params([x]) for x in self.X]
+            best_x = np.array([self.space.vec2params([x]) for x in self.X])
             best_y = self.Y[:, 0]
         else:
             best_x = self.space.vec2params([self.x_opt])
